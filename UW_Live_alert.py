@@ -79,7 +79,7 @@ while True:
         for alert in alerts:
                 if validateAlert(alert):
                     wb.open('https://unusualwhales.com/alerts/'+alert['id'], new=2)
-                    print('Ticker: '+ alert['ticker_symbol']+' Option: '+alert['option_symbol']+f' Max Return: {max_return}' +' Tags: '+ ' '.join([str(elem) for elem in alert['tags']]) +' TimeStamp: '+alert['timestamp']+ ' Link: ' +'https://unusualwhales.com/alerts/'+alert['id']+'\n')
+                    print('Ticker: '+ alert['ticker_symbol']+' Option: '+alert['option_symbol']+' Tags: '+ ' '.join([str(elem) for elem in alert['tags']]) +' TimeStamp: '+alert['timestamp']+ ' Link: ' +'https://unusualwhales.com/alerts/'+alert['id']+'\n')
                     count += 1
         page += 1
 
