@@ -2,12 +2,6 @@ import requests
 from datetime import datetime
 
 ##__Utility Functions_________________________
-def getAlertMax(alertQuotes):
-    max = float(alertQuotes[0]['ask'])
-    for quote in alertQuotes:
-        if float(quote['ask']) > max : max = float(quote['ask'])
-    return max
-
 def getDate(Start):
     if Start:
         date = input("Enter Start Date in format YYYY-MM-DD: ")
@@ -83,7 +77,7 @@ total_count = 0
 count_10 = 0
 count_20 = 0
 count_30 = 0
-count__0 = 0
+count_0_10 = 0
 
 while True:
     offset = page * 100
@@ -94,15 +88,13 @@ while True:
     total_count += len(alerts)
     for alert in alerts:
             if validateAlert(alert):
-                alert_details = s.get(f"https://phx.unusualwhales.com/api/option_quotes/{alert['id']}", headers=APIHEADERS)
-                alert_details = alert_details.json()
-                max_return = getAlertMax(alert_details['option_quotes'])/float(alert['ask'])
+                max_return = float(alert['max_ask'])/float(alert['ask'])
                 max_return = (max_return - 1.0) * 100
                 count += 1
                 if max_return >= 10 : count_10 +=1
                 if max_return >= 20 : count_20 +=1
                 if max_return >= 30 : count_30 +=1
-                if max_return == 0.0 : count__0 +=1
+                if max_return > 0.0 and max_return <= 10 : count_0_10 +=1
     page += 1
 
 #Print results
@@ -115,8 +107,11 @@ per_20 = format((count_20/count) * 100, '.2f')
 print(f'Nbr alert with 20% return: {count_20} represents: {per_20}%')
 per_30 = format((count_30/count) * 100, '.2f')
 print(f'Nbr alert with 30% return: {count_30} represents: {per_30}%')
-per__0 = format((count__0/count) * 100, '.2f')
-print(f'Nbr alert with no return: {count__0} represents: {per__0}%')
+per_0_10 = format((count_0_10/count) * 100, '.2f')
+print(f'Nbr alert with 0-10% return: {count_0_10} represents: {per_0_10}%')
+count0 = count - count_0_10 - count_10
+per0 = format((count0/count) * 100, '.2f')
+print(f'Nbr alert with negative return: {count0} represents: {per0}%')
 print("__________________________________________________________\n")
 print("Ending Back Test at: ", datetime.now())
 print("\n\n")
