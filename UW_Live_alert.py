@@ -30,9 +30,9 @@ def processMessage(message):
             wb.open('https://unusualwhales.com/alerts/'+alert['id'], new=2)
             print("Valid Alert: ")
             print('Ticker: '+ alert['ticker_symbol']+' Option: '+alert['option_symbol']+' Tags: '+ ' '.join([str(elem) for elem in alert['tags']]) +' TimeStamp: '+alert['timestamp']+ ' Link: ' +'https://unusualwhales.com/alerts/'+alert['id']+'\n')
-            print("Details: "+ alert)
+            print("Details: \n", json.dumps(alert, indent=4, sort_keys=True), "\n")
         else:
-            print("Not valid alert: \n" + alert)
+            print("Not valid alert: \n", json.dumps(alert, indent=4, sort_keys=True), "\n")
     elif ((int(message['ref'])-1)%20 == 0):
         print(f"Connected since: {int((int(message['ref'])-1)/2)} min")
          
@@ -66,9 +66,12 @@ def on_message(ws, message):
     processMessage(json.loads(message))
 
 def on_error(ws, error):
-    print(error)
+    err = error
+    print("Error: ",err)
 
 def on_close(ws):
+    now = datetime.now()
+    print("Closing at: ", now)
     print("### closed ###")
 
 def on_open(ws):
@@ -90,10 +93,10 @@ def on_open(ws):
         while True:
             count += 1
             channel = json.dumps({
-            "event": "heartbeat",
-            "payload": {},
-            "ref": f"{count}",
-            "topic": "phoenix"})
+                "event": "heartbeat",
+                "payload": {},
+                "ref": f"{count}",
+                "topic": "phoenix"})
             ws.send(channel)
             time.sleep(30)
         ws.close()
