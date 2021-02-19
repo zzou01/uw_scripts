@@ -1,31 +1,41 @@
 import requests
-import webbrowser as wb
-from datetime import datetime
+import json
+import websocket
 import time
+from datetime import datetime
+import webbrowser as wb
+try:
+    import thread
+except ImportError:
+    import _thread as thread
 
-##Utility Functions
-def getAlertMax(alertQuotes):
-    max = float(alertQuotes[0]['ask'])
-    for quote in alertQuotes:
-        if float(quote['ask']) > max : max = float(quote['ask'])
-    return max
 
-###---------------------------------------------
-
-##___Strategy validator_______________________
 def validateAlert(alert):
     if (float(alert['implied_volatility']) <= 4.0 
         and ((float(alert['volume'])/float(alert['open_interest']) >= 5.0))
         and ((float(alert['ask'])-float(alert['bid']))<=0.15)
-        and ((float(alert['strike_price'])/float(alert['stock_price']) >= 1.05) and alert['option_type'] == 'call')
+        and (((float(alert['strike_price'])/float(alert['stock_price']) >= 1.05) and alert['option_type'] == 'call')
+            or ((float(alert['strike_price'])/float(alert['stock_price']) <= 0.90) and alert['option_type'] == 'put'))
         and (datetime.strptime(alert['expires_at'], '%Y-%m-%d').date() - datetime.strptime(alert['timestamp'], '%Y-%m-%dT%H:%M:%SZ').date()).days <= 60
         ):
         return True
     else:
         return False
 
-###__________________________________________
-
+def processMessage(message):
+    event = message['event']
+    if (event == "new_msg"):
+        alert = message['payload']['data']
+        if validateAlert(alert):
+            wb.open('https://unusualwhales.com/alerts/'+alert['id'], new=2)
+            print("Valid Alert: ")
+            print('Ticker: '+ alert['ticker_symbol']+' Option: '+alert['option_symbol']+' Tags: '+ ' '.join([str(elem) for elem in alert['tags']]) +' TimeStamp: '+alert['timestamp']+ ' Link: ' +'https://unusualwhales.com/alerts/'+alert['id']+'\n')
+            print("Details: "+ alert)
+        else:
+            print("Not valid alert: \n" + alert)
+    elif ((int(message['ref'])-1)%20 == 0):
+        print(f"Connected since: {int((int(message['ref'])-1)/2)} min")
+         
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.66 Safari/537.36', 'origin': 'https://unusualwhales.com', 'referer': 'https://unusualwhales.com/'}
 
@@ -34,7 +44,6 @@ s = requests.session()
 ## enter login info below, or make your own py and reference your login info
 user = input("User email: ")
 password = input("Password: ")
-frequency = int(input("frequency check in minutes: "))
 
 login_payload = {
 		'email': '',
@@ -49,43 +58,54 @@ if login_req.status_code != 200:
     print("Login error: ",login_req.status_code, " : Check your credentials!")
     exit()
 
-now = datetime.now()
-
 session = login_req.json()
 
 token = session['session']['token']
 
-APIHEADERS = {'Content-Type': 'application/json','Authorization': '', 'Accept': 'application/json'}
+def on_message(ws, message):
+    processMessage(json.loads(message))
 
-APIHEADERS['Authorization'] = 'Bearer ' + token
+def on_error(ws, error):
+    print(error)
 
-firstcall = True
+def on_close(ws):
+    print("### closed ###")
 
-datajson = []
-while True:
-    print("Starting verification at: ", datetime.now())
-    page = 0
-    count = 0
-    total_count = 0
-    start_date = (int(datetime.timestamp(datetime.today())*1000)-(frequency * 60 * 1000)) if firstcall else end_date
-    end_date = int(datetime.timestamp(datetime.now())*1000)
-    while True:
-        offset = page * 100
-        data = s.get(f'https://phx.unusualwhales.com/api/option_quotes?offset={offset}&sort=timestamp&search=&sector=&tag=&end_date={end_date}&start_date={start_date}&expiry_start_date=1592179200000&expiry_end_date=1686787200000&min_ask=0&max_ask=25&volume_direction=desc&expiry_direction=desc&alerted_direction=desc&oi_direction=desc&normal=true', headers=APIHEADERS)
-        alerts = data.json()
-        if len(alerts) == 0:
-                break
-        total_count += len(alerts)
-        for alert in alerts:
-                if validateAlert(alert):
-                    wb.open('https://unusualwhales.com/alerts/'+alert['id'], new=2)
-                    print('Ticker: '+ alert['ticker_symbol']+' Option: '+alert['option_symbol']+' Tags: '+ ' '.join([str(elem) for elem in alert['tags']]) +' TimeStamp: '+alert['timestamp']+ ' Link: ' +'https://unusualwhales.com/alerts/'+alert['id']+'\n')
-                    count += 1
-        page += 1
+def on_open(ws):
+    def run(*args):
+        channel = json.dumps({
+            "event": "phx_join",
+            "payload": {},
+            "ref": "",
+            "topic": "alert_results"
+        })
+        count = 1
+        channel = json.dumps({
+            "event": "phx_join",
+            "payload": {},
+            "ref": f"{count}",
+            "topic": "alert_results"})
+        ws.send(channel)
+        
+        while True:
+            count += 1
+            channel = json.dumps({
+            "event": "heartbeat",
+            "payload": {},
+            "ref": f"{count}",
+            "topic": "phoenix"})
+            ws.send(channel)
+            time.sleep(30)
+        ws.close()
+        print("thread terminating...")
+    thread.start_new_thread(run, ())
 
-    print(f'\nValid alerts: {count}')
-    print(f'Alerts verified: {total_count}')
-    print("Ending verification at: ", datetime.now())
-    print(f'\nTo exit hit Ctrl+c \nWaiting for {frequency} minute(s) ...\n')
-    time.sleep(60*frequency)
-    firstcall = False
+
+if __name__ == "__main__":
+    #websocket.enableTrace(True)
+    ws = websocket.WebSocketApp(f"wss://ws.unusualwhales.com/socket/websocket?token={token}",
+                              on_message = on_message,
+                              on_error = on_error,
+                              on_close = on_close)
+    ws.on_open = on_open
+    ws.run_forever()
