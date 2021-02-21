@@ -4,29 +4,18 @@ import websocket
 import time
 from datetime import datetime
 import webbrowser as wb
+import StrategyValidator as SV
 try:
     import thread
 except ImportError:
     import _thread as thread
 
 
-def validateAlert(alert):
-    if (float(alert['implied_volatility']) <= 4.0 
-        and ((float(alert['volume'])/float(alert['open_interest']) >= 5.0))
-        and ((float(alert['ask'])-float(alert['bid']))<=0.15)
-        and (((float(alert['strike_price'])/float(alert['stock_price']) >= 1.05) and alert['option_type'] == 'call')
-            or ((float(alert['strike_price'])/float(alert['stock_price']) <= 0.90) and alert['option_type'] == 'put'))
-        and (datetime.strptime(alert['expires_at'], '%Y-%m-%d').date() - datetime.strptime(alert['timestamp'], '%Y-%m-%dT%H:%M:%SZ').date()).days <= 60
-        ):
-        return True
-    else:
-        return False
-
 def processMessage(message):
     event = message['event']
     if (event == "new_msg"):
         alert = message['payload']['data']
-        if validateAlert(alert):
+        if SV.validateAlert(alert,choice):
             wb.open('https://unusualwhales.com/alerts/'+alert['id'], new=2)
             print("Valid Alert: ")
             print('Ticker: '+ alert['ticker_symbol']+' Option: '+alert['option_symbol']+' Tags: '+ ' '.join([str(elem) for elem in alert['tags']]) +' TimeStamp: '+alert['timestamp']+ ' Link: ' +'https://unusualwhales.com/alerts/'+alert['id']+'\n')
@@ -44,6 +33,7 @@ s = requests.session()
 ## enter login info below, or make your own py and reference your login info
 user = input("User email: ")
 password = input("Password: ")
+choice = SV.chooseYourStrategy()
 
 login_payload = {
 		'email': '',

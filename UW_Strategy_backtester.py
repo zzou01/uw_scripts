@@ -1,5 +1,7 @@
 import requests
+import webbrowser as wb
 from datetime import datetime
+import StrategyValidator as SV
 
 ##__Utility Functions_________________________
 def getDate(Start):
@@ -20,20 +22,6 @@ def getDate(Start):
 
 ###___________________________________________
 
-##___Strategy validator_______________________
-def validateAlert(alert):
-    if (float(alert['implied_volatility']) <= 4.0 
-        and ((float(alert['volume'])/float(alert['open_interest']) >= 5.0))
-        and ((float(alert['ask'])-float(alert['bid']))<=0.15)
-        and ((float(alert['strike_price'])/float(alert['stock_price']) >= 1.05) and alert['option_type'] == 'call')
-        and (datetime.strptime(alert['expires_at'], '%Y-%m-%d').date() - datetime.strptime(alert['timestamp'], '%Y-%m-%dT%H:%M:%SZ').date()).days <= 60
-        ):
-        return True
-    else:
-        return False
-
-###__________________________________________
-
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.66 Safari/537.36', 'origin': 'https://unusualwhales.com', 'referer': 'https://unusualwhales.com/'}
 
 s = requests.session()
@@ -41,6 +29,7 @@ s = requests.session()
 ## enter login info below
 user = input("User email: ")
 password = input("Password: ")
+choice = SV.chooseYourStrategy()
 
 start_date = getDate(True)
 end_date = getDate(False)
@@ -70,7 +59,7 @@ APIHEADERS['Authorization'] = 'Bearer ' + token
 
 datajson = []
 
-print("\n\nStarting Back Test at: ", datetime.now())
+print("\nStarting Back Test at: ", datetime.now())
 page = 0
 count = 0
 total_count = 0
@@ -87,10 +76,12 @@ while True:
             break
     total_count += len(alerts)
     for alert in alerts:
-            if validateAlert(alert):
+            if SV.validateAlert(alert, choice):
+                #wb.open('https://unusualwhales.com/alerts/'+alert['id'], new=2)
+                #print('Ticker: '+ alert['ticker_symbol']+' Option: '+alert['option_symbol']+' Tags: '+ ' '.join([str(elem) for elem in alert['tags']]) +' TimeStamp: '+alert['timestamp']+ ' Link: ' +'https://unusualwhales.com/alerts/'+alert['id']+'\n')
+                count += 1
                 max_return = float(alert['max_ask'])/float(alert['ask'])
                 max_return = (max_return - 1.0) * 100
-                count += 1
                 if max_return >= 10 : count_10 +=1
                 if max_return >= 20 : count_20 +=1
                 if max_return >= 30 : count_30 +=1
@@ -99,19 +90,21 @@ while True:
 
 #Print results
 print("RESULTS:___________________________________________________")
-per = format((count/total_count) * 100, '.2f')
-print(f'Valid Alerts: {count} represents: {per}% of {total_count} alerts verified')
-per_10 = format((count_10/count) * 100, '.2f')
-print(f'Nbr alert with 10% return: {count_10} represents: {per_10}%')
-per_20 = format((count_20/count) * 100, '.2f')
-print(f'Nbr alert with 20% return: {count_20} represents: {per_20}%')
-per_30 = format((count_30/count) * 100, '.2f')
-print(f'Nbr alert with 30% return: {count_30} represents: {per_30}%')
-per_0_10 = format((count_0_10/count) * 100, '.2f')
-print(f'Nbr alert with 0-10% return: {count_0_10} represents: {per_0_10}%')
-count0 = count - count_0_10 - count_10
-per0 = format((count0/count) * 100, '.2f')
-print(f'Nbr alert with negative return: {count0} represents: {per0}%')
+if total_count:
+    per = format((count/total_count) * 100, '.2f')
+    print(f'Valid Alerts: {count} represents: {per}% of {total_count} alerts verified')
+if count:
+    per_10 = format((count_10/count) * 100, '.2f')
+    print(f'Nbr alert with 10% return: {count_10} represents: {per_10}%')
+    per_20 = format((count_20/count) * 100, '.2f')
+    print(f'Nbr alert with 20% return: {count_20} represents: {per_20}%')
+    per_30 = format((count_30/count) * 100, '.2f')
+    print(f'Nbr alert with 30% return: {count_30} represents: {per_30}%')
+    per_0_10 = format((count_0_10/count) * 100, '.2f')
+    print(f'Nbr alert with 0-10% return: {count_0_10} represents: {per_0_10}%')
+    count0 = count - count_0_10 - count_10
+    per0 = format((count0/count) * 100, '.2f')
+    print(f'Nbr alert with negative return: {count0} represents: {per0}%')
 print("__________________________________________________________\n")
 print("Ending Back Test at: ", datetime.now())
 print("\n\n")
